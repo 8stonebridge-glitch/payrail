@@ -2,7 +2,7 @@
 
 import { Sidebar } from "@/components/ui/Sidebar";
 import { UserButton } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState, createContext, useContext } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -30,7 +30,11 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const companiesData = useQuery(api.queries.myCompanies);
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const companiesData = useQuery(
+    api.queries.myCompanies,
+    isAuthenticated ? undefined : "skip"
+  );
   const [activeIdx, setActiveIdx] = useState(0);
 
   const companies = (companiesData ?? []) as Array<{
@@ -54,6 +58,14 @@ export default function DashboardLayout({
     actions: stats?.pendingApprovals ?? 0,
     governance: 0,
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <CompanyCtx.Provider

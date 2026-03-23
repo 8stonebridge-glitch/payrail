@@ -52,12 +52,27 @@ export default defineSchema({
   users: defineTable({
     name: v.string(),
     email: v.string(),
+    clerkId: v.optional(v.string()),
+    displayName: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
     active: v.boolean(),
-    createdAt: v.string(),
-    updatedAt: v.string(),
+    createdAt: v.union(v.string(), v.number()),
+    updatedAt: v.optional(v.string()),
   })
     .index("by_email", ["email"])
-    .index("by_active", ["active"]),
+    .index("by_active", ["active"])
+    .index("by_clerkId", ["clerkId"]),
+
+  companyMemberships: defineTable({
+    userId: v.id("users"),
+    companyId: v.id("companies"),
+    roles: v.array(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_company", ["companyId"])
+    .index("by_user_company", ["userId", "companyId"]),
 
   userCompanyRoles: defineTable({
     userId: v.id("users"),

@@ -1,7 +1,7 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser, validateApprovalAuthority } from "./lib/permissions";
-import { assertTransition, determineNextStatus } from "./lib/stateMachine";
+import { determineNextStatus } from "./lib/stateMachine";
 import { recordTimelineEvent } from "./lib/audit";
 
 // ─── APPROVE STEP ───
@@ -37,15 +37,15 @@ export const approveStep = mutation({
       ctx,
       user._id,
       args.companyId,
-      waitingStep.requiredRole,
-      request.requestedBy
+      waitingStep.role,
+      request.requesterId
     );
 
     // Approve the step
     await ctx.db.patch(waitingStep._id, {
-      status: "approved",
-      decidedBy: user._id,
-      decidedAt: Date.now(),
+      status: "approved" as const,
+      actedByUserId: user._id,
+      actedAt: new Date().toISOString(),
     });
 
     // Determine next status
@@ -59,22 +59,17 @@ export const approveStep = mutation({
     if (nextStepIndex !== null) {
       const nextStep = allSteps.find((s) => s.stepOrder === nextStepIndex);
       if (nextStep) {
-        await ctx.db.patch(nextStep._id, { status: "waiting" });
+        await ctx.db.patch(nextStep._id, { status: "waiting" as const });
       }
     }
 
     // Update request status
-    const updateFields: Record<string, unknown> = {
-      status: newRequestStatus === "approved" ? "awaiting_finance" : newRequestStatus,
-      currentStepIndex: nextStepIndex,
-    };
-
-    if (newRequestStatus === "approved") {
-      updateFields.approvedAt = Date.now();
-      updateFields.status = "awaiting_finance";
-    }
-
-    await ctx.db.patch(args.requestId, updateFields as any);
+    const finalStatus = newRequestStatus === "approved" ? "awaiting_finance" : newRequestStatus;
+    await ctx.db.patch(args.requestId, {
+      status: finalStatus as any,
+      currentApprovalStepIndex: nextStepIndex ?? undefined,
+      updatedAt: new Date().toISOString(),
+    });
 
     await recordTimelineEvent(ctx, {
       entityType: "request",
@@ -84,12 +79,11 @@ export const approveStep = mutation({
       actorId: user._id,
       metadata: {
         stepOrder: waitingStep.stepOrder,
-        stepLabel: waitingStep.label,
-        newStatus: updateFields.status,
+        newStatus: finalStatus,
       },
     });
 
-    return { newStatus: updateFields.status };
+    return { newStatus: finalStatus };
   },
 });
 
@@ -121,24 +115,25 @@ export const rejectStep = mutation({
       ctx,
       user._id,
       args.companyId,
-      waitingStep.requiredRole,
-      request.requestedBy
+      waitingStep.role,
+      request.requesterId
     );
 
     // Reject the step
     await ctx.db.patch(waitingStep._id, {
-      status: "rejected",
-      decidedBy: user._id,
-      decidedAt: Date.now(),
-      rejectionReason: args.reason,
+      status: "rejected" as const,
+      actedByUserId: user._id,
+      actedAt: new Date().toISOString(),
+      note: args.reason,
     });
 
     // Update request
     await ctx.db.patch(args.requestId, {
-      status: "rejected",
-      currentStepIndex: null,
-      rejectionCount: request.rejectionCount + 1,
-      lastRejectedAt: Date.now(),
+      status: "rejected" as const,
+      currentApprovalStepIndex: undefined,
+      rejectionReason: args.reason,
+      rejectedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
 
     await recordTimelineEvent(ctx, {
@@ -149,7 +144,6 @@ export const rejectStep = mutation({
       actorId: user._id,
       metadata: {
         stepOrder: waitingStep.stepOrder,
-        stepLabel: waitingStep.label,
         reason: args.reason,
       },
     });

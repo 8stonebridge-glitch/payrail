@@ -15,6 +15,7 @@ const role = v.union(
 
 const requestStatus = v.union(
   v.literal("draft"),
+  v.literal("submitted"),
   v.literal("in_approval"),
   v.literal("awaiting_finance"),
   v.literal("partially_paid"),

@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useCompany } from "../layout";
@@ -15,14 +16,13 @@ const STATUS_FILTERS = [
   { label: "Draft", value: "draft" },
   { label: "In Approval", value: "in_approval" },
   { label: "Submitted", value: "submitted" },
-  { label: "Approved", value: "approved" },
   { label: "Awaiting Finance", value: "awaiting_finance" },
   { label: "Partially Paid", value: "partially_paid" },
   { label: "Paid", value: "paid" },
   { label: "Rejected", value: "rejected" },
 ];
 
-export default function RequestListPage() {
+function RequestListInner() {
   const { activeCompanyId } = useCompany();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get("status") ?? undefined;
@@ -88,9 +88,7 @@ export default function RequestListPage() {
                 <th className="text-left">Category</th>
                 <th className="text-left">Description</th>
                 <th className="text-right">Amount</th>
-                <th className="text-left">Requester</th>
                 <th className="text-left">Status</th>
-                <th className="text-left">Current Step</th>
                 <th className="text-left">Date</th>
               </tr>
             </thead>
@@ -104,16 +102,12 @@ export default function RequestListPage() {
                   </td>
                   <td className="text-slate-300">{req.category}</td>
                   <td className="text-slate-400 max-w-[200px] truncate">{req.description}</td>
-                  <td className="text-right font-mono">{formatCurrency(req.totalAmount, req.currency)}</td>
-                  <td className="text-slate-400">{req.requesterName}</td>
+                  <td className="text-right font-mono">{formatCurrency(req.totalAmount)}</td>
                   <td>
                     <div className="flex items-center gap-1.5">
                       <StatusChip status={req.status} />
-                      <RejectionBadge count={req.rejectionCount} />
-                      <SubmissionBadge count={req.submissionCount} />
                     </div>
                   </td>
-                  <td className="text-xs text-slate-400">{req.currentStepLabel ?? "—"}</td>
                   <td className="text-xs text-slate-500">{formatRelativeTime(req.createdAt)}</td>
                 </tr>
               ))}
@@ -122,5 +116,13 @@ export default function RequestListPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function RequestListPage() {
+  return (
+    <Suspense fallback={<div className="text-slate-500 text-center py-16">Loading...</div>}>
+      <RequestListInner />
+    </Suspense>
   );
 }
